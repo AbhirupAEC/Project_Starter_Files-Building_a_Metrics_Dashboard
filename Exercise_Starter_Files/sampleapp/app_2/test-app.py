@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def homepage():
-    gh_jobs = "https://jobs.github.com/positions.json?description=python"
+    gh_jobs = "https://dog.ceo/api/breeds/image/random"
 
     parent_span = flask_tracer.get_span()
     with tracer.start_span("get-python-jobs", child_of=parent_span) as span:
@@ -22,8 +22,8 @@ def homepage():
     with tracer.start_span("get-json", child_of=parent_span) as span:
         myjson = res.json()
 
-        span.set_tag("python_jobs", len(myjson))
-        pull_python_jobs = map(lambda item: item["title"], myjson)
+        span.set_tag("message", len(myjson))
+        pull_python_jobs = map(lambda item: item["message"], myjson)
 
     return "Tracing Results: " + ", ".join(pull_python_jobs)
 
