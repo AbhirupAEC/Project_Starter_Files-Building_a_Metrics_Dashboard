@@ -1,0 +1,5 @@
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      name: prometheus-config
+      key: prometheus.yml

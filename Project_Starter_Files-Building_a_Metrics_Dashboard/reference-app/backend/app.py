@@ -1,14 +1,15 @@
 import logging
 import re
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from flask_opentracing import FlaskTracing
 from jaeger_client import Config
 from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from prometheus_flask_exporter import PrometheusMetrics
-
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
+import time
 
 
 app = Flask(__name__)
@@ -16,6 +17,20 @@ app = Flask(__name__)
 metrics = PrometheusMetrics(app)
 # static information as metric
 metrics.info("app_info", "Application info", version="1.0.3")
+
+# Custom metrics
+REQUEST_COUNT = Counter('http_request_total', 'Total HTTP Requests', ['method', 'status', 'path'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP Request Duration', ['method', 'status', 'path'])
+REQUEST_IN_PROGRESS = Gauge('http_requests_in_progress', 'HTTP Requests in progress', ['method', 'path'])
+APP_UPTIME = Gauge('app_uptime_seconds', 'Application uptime in seconds')
+
+# System metrics
+CPU_USAGE = Gauge('process_cpu_usage', 'Current CPU usage in percent')
+MEMORY_USAGE = Gauge('process_memory_usage_bytes', 'Current memory usage in bytes')
+MEMORY_USAGE_MB = Gauge('app_memory_usage_mb', 'Memory usage in MB')
+
+start_time = time.time()
+
 
 logging.getLogger("").handlers = []
 logging.basicConfig(format="%(message)s", level=logging.DEBUG)
@@ -77,7 +92,27 @@ def trace():
 
     return jsonify(result_info)
 
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+    REQUEST_IN_PROGRESS.labels(method=request.method, path=request.path).inc()
 
+@app.after_request
+def after_request(response):
+    request_latency = time.time() - request.start_time
+    REQUEST_COUNT.labels(method=request.method, status=response.status_code, path=request.path).inc()
+    REQUEST_LATENCY.labels(method=request.method, status=response.status_code, path=request.path).observe(request_latency)
+    REQUEST_IN_PROGRESS.labels(method=request.method, path=request.path).dec()
+    return response
+
+@app.route('/uptime_checker')
+def metrics():
+    APP_UPTIME.set(time.time() - start_time)
+    return generate_latest()
+
+@app.route('/error')
+def error():
+    return jsonify({"error": "An intentional error occurred!"}), 500
 
 if __name__ == "__main__":
     app.run()

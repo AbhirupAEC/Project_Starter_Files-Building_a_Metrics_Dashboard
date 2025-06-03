@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frontend-service-monitor
+  namespace: default
+  labels:
+    app: frontend-service
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: frontend-service # target gitlab service
+  endpoints:
+  - interval: 15s
+      

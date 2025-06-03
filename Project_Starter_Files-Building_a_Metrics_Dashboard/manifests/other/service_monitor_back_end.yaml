@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-service-monitor
+  namespace: default
+  labels:
+    app: backend-service
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: backend-service # target gitlab service
+  endpoints:
+  - interval: 15s
+      
